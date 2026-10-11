@@ -2,6 +2,8 @@ const t = require('tap')
 
 const fs = require('node:fs')
 const { readFileSync } = fs
+const { homedir } = require('node:os')
+const { resolve, join, dirname } = require('node:path')
 
 // when running with `npm test` it adds environment variables that
 // mess with the things we expect here, so delete all of those.
@@ -16,11 +18,28 @@ const createDef = (key, value) => ({ [key]: new Definition(key, { key, ...value 
 
 const typeDefs = require('../lib/type-defs.js')
 
-const { resolve, join, dirname } = require('node:path')
+const nodePrefix = process.platform === 'win32'
+  ? dirname(process.execPath)
+  : dirname(dirname(process.execPath))
+const externalNpmrcs = new Set([
+  resolve('/etc/npmrc'),
+  resolve(nodePrefix, 'etc/npmrc'),
+  resolve(homedir(), '.npmrc'),
+])
+const throwIfExternalNpmrc = path => {
+  if (typeof path === 'string' && externalNpmrcs.has(resolve(path))) {
+    throw Object.assign(new Error(`ENOENT: no such file or directory, open '${path}'`), {
+      code: 'ENOENT',
+      path,
+      syscall: 'open',
+    })
+  }
+}
 
 const mockFs = {
   ...fs,
   readFileSync: (path, ...args) => {
+    throwIfExternalNpmrc(path)
     if (path.includes('WEIRD-ERROR')) {
       throw Object.assign(new Error('weird error'), { code: 'EWEIRD' })
     }
@@ -32,6 +51,7 @@ const mockFs = {
 const mockFsPromises = {
   ...fs.promises,
   readFile: async (path, ...args) => {
+    throwIfExternalNpmrc(path)
     if (path.includes('WEIRD-ERROR')) {
       throw Object.assign(new Error('weird error'), { code: 'EWEIRD' })
     }
@@ -2314,6 +2334,75 @@ t.test('CLI --min-release-age beats env npm_config_min_release_age', async t => 
     Math.abs(config.flat.before.getTime() - expected) < 60_000,
     'CLI --min-release-age=3 overrides env npm_config_min_release_age=30'
   )
+})
+
+t.test('min-release-age-exclude', async t => {
+  t.test('defaults to an empty array', async t => {
+    const path = t.testdir()
+    const config = new Config({
+      npmPath: `${path}/npm`,
+      env: {},
+      argv: [process.execPath, __filename],
+      cwd: path,
+      definitions,
+      shorthands,
+      flatten,
+    })
+    await config.load()
+    t.same(config.flat.minReleaseAgeExclude, [], 'flattens to []')
+  })
+
+  t.test('a single value flattens to a one-element array', async t => {
+    const path = t.testdir()
+    const config = new Config({
+      npmPath: `${path}/npm`,
+      env: {},
+      argv: [process.execPath, __filename, '--min-release-age-exclude=@myorg/*'],
+      cwd: path,
+      definitions,
+      shorthands,
+      flatten,
+    })
+    await config.load()
+    t.same(config.flat.minReleaseAgeExclude, ['@myorg/*'], 'single pattern')
+  })
+
+  t.test('repeated flags accumulate into an array', async t => {
+    const path = t.testdir()
+    const config = new Config({
+      npmPath: `${path}/npm`,
+      env: {},
+      argv: [
+        process.execPath,
+        __filename,
+        '--min-release-age-exclude=@myorg/*',
+        '--min-release-age-exclude=lodash',
+      ],
+      cwd: path,
+      definitions,
+      shorthands,
+      flatten,
+    })
+    await config.load()
+    t.same(config.flat.minReleaseAgeExclude, ['@myorg/*', 'lodash'], 'two patterns')
+  })
+
+  t.test('a comma-delimited string is split, trimmed, and deduped', async t => {
+    const dir = t.testdir({
+      '.npmrc': 'min-release-age-exclude = @myorg/* , lodash ,@myorg/*',
+    })
+    const config = new Config({
+      npmPath: __dirname,
+      env: { HOME: dir },
+      argv: [process.execPath, __filename],
+      cwd: dir,
+      definitions,
+      shorthands,
+      flatten,
+    })
+    await config.load()
+    t.same(config.flat.minReleaseAgeExclude, ['@myorg/*', 'lodash'], 'normalized list')
+  })
 })
 
 t.test('global-ignore-file defaults to ${prefix}/etc/npmignore', async t => {

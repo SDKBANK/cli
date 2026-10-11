@@ -53,6 +53,9 @@ Object {
   "allow-scripts-pin": Array [
     "boolean value (true or false)",
   ],
+  "allow-unused-patches": Array [
+    "boolean value (true or false)",
+  ],
   "also": Array [
     null,
     "dev",
@@ -170,6 +173,10 @@ Object {
   "dry-run": Array [
     "boolean value (true or false)",
   ],
+  "edit-dir": Array [
+    null,
+    "valid filesystem path",
+  ],
   "editor": Array [
     Function String(),
   ],
@@ -187,6 +194,10 @@ Object {
   "expires": Array [
     null,
     "numeric value",
+  ],
+  "extension-file": Array [
+    null,
+    "valid filesystem path",
   ],
   "fetch-retries": Array [
     "numeric value",
@@ -241,6 +252,15 @@ Object {
     "full url with \\"http://\\"",
   ],
   "if-present": Array [
+    "boolean value (true or false)",
+  ],
+  "ignore-existing": Array [
+    "boolean value (true or false)",
+  ],
+  "ignore-extension": Array [
+    "boolean value (true or false)",
+  ],
+  "ignore-patch-failures": Array [
     "boolean value (true or false)",
   ],
   "ignore-scripts": Array [
@@ -318,6 +338,9 @@ Object {
   "json": Array [
     "boolean value (true or false)",
   ],
+  "keep-edit-dir": Array [
+    "boolean value (true or false)",
+  ],
   "key": Array [
     null,
     Function String(),
@@ -378,6 +401,10 @@ Object {
   "min-release-age": Array [
     null,
     "numeric value",
+  ],
+  "min-release-age-exclude": Array [
+    Function Array(),
+    Function String(),
   ],
   "name": Array [
     null,
@@ -459,6 +486,7 @@ Object {
     null,
     "read-only",
     "read-write",
+    "read-write-stage-only",
     "no-access",
   ],
   "parseable": Array [
@@ -466,6 +494,9 @@ Object {
   ],
   "password": Array [
     null,
+    Function String(),
+  ],
+  "patches-dir": Array [
     Function String(),
   ],
   "prefer-dedupe": Array [
@@ -585,6 +616,9 @@ Object {
   "strict-allow-scripts": Array [
     "boolean value (true or false)",
   ],
+  "strict-npmrc": Array [
+    "boolean value (true or false)",
+  ],
   "strict-peer-deps": Array [
     "boolean value (true or false)",
   ],
@@ -599,6 +633,10 @@ Object {
   ],
   "timing": Array [
     "boolean value (true or false)",
+  ],
+  "to": Array [
+    null,
+    Function String(),
   ],
   "token-description": Array [
     null,

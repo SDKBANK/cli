@@ -860,6 +860,102 @@ t.test('user-agent', t => {
   t.end()
 })
 
+t.test('user-agent github actions ci variants', t => {
+  const npmVersion = '1.2.3'
+  const base = `npm/${npmVersion} node/${process.version} ` +
+    `${process.platform} ${process.arch} workspaces/false`
+
+  const cases = [
+    {
+      name: 'dotcom + github-hosted runner',
+      env: { GITHUB_SERVER_URL: 'https://github.com', RUNNER_ENVIRONMENT: 'github-hosted' },
+      expect: `${base} ci/github-actions/dotcom-hosted`,
+    },
+    {
+      name: 'dotcom + self-hosted runner',
+      env: { GITHUB_SERVER_URL: 'https://github.com', RUNNER_ENVIRONMENT: 'self-hosted' },
+      expect: `${base} ci/github-actions/dotcom-selfhosted`,
+    },
+    {
+      name: 'dotcom + missing runner environment',
+      env: { GITHUB_SERVER_URL: 'https://github.com', RUNNER_ENVIRONMENT: undefined },
+      expect: `${base} ci/github-actions/dotcom`,
+    },
+    {
+      name: 'dotcom + whitespace runner environment',
+      env: { GITHUB_SERVER_URL: 'https://github.com', RUNNER_ENVIRONMENT: '   ' },
+      expect: `${base} ci/github-actions/dotcom`,
+    },
+    {
+      name: 'ghe.com tenant',
+      env: { GITHUB_SERVER_URL: 'https://octocorp.ghe.com', RUNNER_ENVIRONMENT: 'github-hosted' },
+      expect: `${base} ci/github-actions/ghecom`,
+    },
+    {
+      name: 'bare ghe.com host',
+      env: { GITHUB_SERVER_URL: 'https://ghe.com', RUNNER_ENVIRONMENT: 'github-hosted' },
+      expect: `${base} ci/github-actions/ghecom`,
+    },
+    {
+      name: 'ghe.com only in path is treated as ghes',
+      env: { GITHUB_SERVER_URL: 'https://evil.example/x.ghe.com', RUNNER_ENVIRONMENT: 'self-hosted' },
+      expect: `${base} ci/github-actions/ghes`,
+    },
+    {
+      name: 'ghes (non-empty, non github.com, non ghe.com)',
+      env: { GITHUB_SERVER_URL: 'https://github.example.com', RUNNER_ENVIRONMENT: 'self-hosted' },
+      expect: `${base} ci/github-actions/ghes`,
+    },
+    {
+      name: 'missing server url stays generic',
+      env: { GITHUB_SERVER_URL: undefined, RUNNER_ENVIRONMENT: undefined },
+      expect: `${base} ci/github-actions`,
+    },
+    {
+      name: 'whitespace server url stays generic',
+      env: { GITHUB_SERVER_URL: '   ', RUNNER_ENVIRONMENT: 'github-hosted' },
+      expect: `${base} ci/github-actions`,
+    },
+  ]
+
+  for (const { name, env, expect } of cases) {
+    t.test(name, t => {
+      mockGlobals(t, { 'process.env': env })
+      const defs = mockDefs({
+        'ci-info': { isCi: true, name: 'GitHub Actions', GITHUB_ACTIONS: true },
+      })
+      const obj = {
+        'npm-version': npmVersion,
+        'user-agent': defs['user-agent'].default,
+      }
+      const flat = {}
+      defs['user-agent'].flatten('user-agent', obj, flat)
+      t.equal(flat.userAgent, expect)
+      t.equal(process.env.npm_config_user_agent, flat.userAgent, 'npm_user_config environment is set')
+      t.end()
+    })
+  }
+
+  t.test('non github-actions ci is unchanged', t => {
+    mockGlobals(t, {
+      'process.env': { GITHUB_SERVER_URL: 'https://github.com', RUNNER_ENVIRONMENT: 'github-hosted' },
+    })
+    const defs = mockDefs({
+      'ci-info': { isCi: true, name: 'Travis CI', GITHUB_ACTIONS: false },
+    })
+    const obj = {
+      'npm-version': npmVersion,
+      'user-agent': defs['user-agent'].default,
+    }
+    const flat = {}
+    defs['user-agent'].flatten('user-agent', obj, flat)
+    t.equal(flat.userAgent, `${base} ci/travis-ci`)
+    t.end()
+  })
+
+  t.end()
+})
+
 t.test('save-prefix', t => {
   const obj = {
     'save-exact': true,
@@ -1065,6 +1161,33 @@ t.test('node-gyp', t => {
     t.end()
   })
 
+  t.end()
+})
+
+t.test('allow-git defaults to none and flattens to allowGit', t => {
+  const defs = mockDefs()
+  t.equal(defs['allow-git'].default, 'none')
+  t.strictSame(defs['allow-git'].type, ['all', 'none', 'root'])
+  const flat = {}
+  defs['allow-git'].flatten('allow-git', { 'allow-git': 'root' }, flat)
+  t.strictSame(flat, { allowGit: 'root' })
+  t.end()
+})
+
+t.test('allow-remote defaults to none and flattens to allowRemote', t => {
+  const defs = mockDefs()
+  t.equal(defs['allow-remote'].default, 'none')
+  t.strictSame(defs['allow-remote'].type, ['all', 'none', 'root'])
+  const flat = {}
+  defs['allow-remote'].flatten('allow-remote', { 'allow-remote': 'all' }, flat)
+  t.strictSame(flat, { allowRemote: 'all' })
+  t.end()
+})
+
+t.test('allow-file and allow-directory still default to all', t => {
+  const defs = mockDefs()
+  t.equal(defs['allow-file'].default, 'all', 'allow-file unchanged')
+  t.equal(defs['allow-directory'].default, 'all', 'allow-directory unchanged')
   t.end()
 })
 

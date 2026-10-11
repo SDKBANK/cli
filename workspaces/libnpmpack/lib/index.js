@@ -12,6 +12,11 @@ async function pack (spec = 'file:.', opts = {}) {
   // gets spec
   spec = npa(spec)
 
+  // An explicit directory is the package being packed, not a dependency fetch.
+  if (spec.type === 'directory') {
+    opts = { ...opts, allowDirectory: 'all' }
+  }
+
   const manifest = await pacote.manifest(spec, { ...opts, Arborist, _isRoot: true })
 
   if (spec.type === 'directory') {
@@ -64,16 +69,23 @@ async function pack (spec = 'file:.', opts = {}) {
   }
 
   // packs tarball
-  const tarball = await pacote.tarball(manifest._resolved, {
+  const tarballOpts = {
     ...opts,
     Arborist,
     integrity: manifest._integrity,
-  })
+  }
+  // pacote re-parses manifest._resolved as type=remote, so allow-remote=none
+  // would mis-fire on the tarball URL the registry just handed us. mirror
+  // arborist reify's carve-out: trust resolved tarballs for registry-typed specs.
+  if (spec.registry) {
+    tarballOpts.allowRemote = 'all'
+  }
+  const tarball = await pacote.tarball(manifest._resolved, tarballOpts)
 
   // check for explicit `false` so the default behavior is to skip writing to disk
   if (opts.dryRun === false) {
     const filename = `${manifest.name}-${manifest.version}.tgz`
-      .replace(/^@/, '').replace(/\//, '-')
+      .replace(/^@/, '').replace(/[/\\]/g, '-')
     const destination = path.resolve(opts.packDestination, filename)
     await writeFile(destination, tarball)
   }
