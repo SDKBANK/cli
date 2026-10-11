@@ -1,4 +1,4 @@
-# npm - a JavaScript package manager
+npm - a JavaScript package manager
 
 ### Requirements
 
